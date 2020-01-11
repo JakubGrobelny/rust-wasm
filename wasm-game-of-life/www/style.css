@@ -9,3 +9,8 @@ body {
     align-items: center;
     justify-content: center;
 }
+
+#fps {
+    white-space: pre;
+    font-family: monospace;
+}

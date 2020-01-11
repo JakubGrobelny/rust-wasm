@@ -8,6 +8,7 @@ extern crate fixedbitset;
 use fixedbitset::FixedBitSet;
 
 extern crate web_sys;
+use web_sys::console;
 
 macro_rules! log {
     ( $( $t:tt )* ) => {
@@ -20,6 +21,23 @@ macro_rules! log {
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+pub struct Timer<'a> {
+    name: &'a str,
+}
+
+impl<'a> Timer<'a> {
+    pub fn new(name: &'a str) -> Timer<'a> {
+        console::time_with_label(name);
+        Timer { name }
+    }
+}
+
+impl<'a> Drop for Timer <'a> {
+    fn drop(&mut self) {
+        console::time_end_with_label(self.name);
+    }
+}
 
 #[wasm_bindgen]
 #[repr(u8)]
@@ -36,13 +54,15 @@ pub struct Universe {
     cells: FixedBitSet,
 }
 
+const UNIVERSE_SIZE : u32 = 64;
+
 #[wasm_bindgen]
 impl Universe {
     pub fn new() -> Universe {
         utils::set_panic_hook();
 
-        let width = 64;
-        let height = 64;
+        let width = UNIVERSE_SIZE;
+        let height = UNIVERSE_SIZE;
 
         let size = (width * height) as usize;
         let mut cells = FixedBitSet::with_capacity(size);
@@ -121,6 +141,7 @@ impl Universe {
     }
 
     pub fn tick(&mut self) {
+        let _timer = Timer::new("Universe::tick");
         let mut next = self.cells.clone();
 
         for row in 0..self.height {
