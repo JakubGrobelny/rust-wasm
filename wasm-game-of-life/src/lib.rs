@@ -50,16 +50,39 @@ impl Universe {
         self.width
     }
 
-    pub fn  height(&self) -> u32 {
+    pub fn height(&self) -> u32 {
         self.height
     }
 
-    pub fn cells(&self) -> *const u32 {
+    pub fn cells_ptr(&self) -> *const u32 {
         self.cells.as_slice().as_ptr()
     }
 
     fn get_index(&self, row: u32, col: u32) -> usize {
         (row * self.width + col) as usize
+    }
+
+    pub fn cell_at(&self, row: u32, col: u32) -> Cell {
+        if self.cells[self.get_index(row, col)] {
+            Cell::Alive
+        } else {
+            Cell::Dead
+        }
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.width = width;
+        self.height = height;
+        let size = (width * height) as usize;
+        self.cells = FixedBitSet::with_capacity(size);
+    }
+
+    pub fn set_width(&mut self, width: u32) {
+        self.resize(width, self.height);
+    }
+
+    pub fn set_height(&mut self, height: u32) {
+        self.resize(self.width, height);
     }
 
     fn live_neighbour_count(&self, row: u32, col: u32) -> u8 {
@@ -99,5 +122,26 @@ impl Universe {
         }
 
         self.cells = next;
+    }
+}
+
+impl Universe {
+    pub fn set_cells(&mut self, coords: &[(u32, u32)]) {
+        for (row, col) in coords {
+            self.cells.insert(self.get_index(*row, *col))
+        }
+    }
+
+    pub fn get_cells(self) -> Vec<Cell> {
+        self.cells
+            .as_slice()
+            .iter()
+            .map(|i| {
+                match i {
+                    0 => Cell::Dead,
+                    _ => Cell::Alive
+                }
+            })
+            .collect()
     }
 }
