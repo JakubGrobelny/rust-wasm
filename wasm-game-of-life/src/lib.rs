@@ -1,9 +1,19 @@
 mod utils;
 
 use wasm_bindgen::prelude::*;
+
 extern crate js_sys;
+
 extern crate fixedbitset;
 use fixedbitset::FixedBitSet;
+
+extern crate web_sys;
+
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -29,6 +39,8 @@ pub struct Universe {
 #[wasm_bindgen]
 impl Universe {
     pub fn new() -> Universe {
+        utils::set_panic_hook();
+
         let width = 64;
         let height = 64;
 
@@ -60,6 +72,11 @@ impl Universe {
 
     fn get_index(&self, row: u32, col: u32) -> usize {
         (row * self.width + col) as usize
+    }
+
+    pub fn toggle_cell(&mut self, row: u32, col: u32) {
+        let idx = self.get_index(row, col);
+        self.cells.toggle(idx);
     }
 
     pub fn cell_at(&self, row: u32, col: u32) -> Cell {
@@ -112,12 +129,28 @@ impl Universe {
                 let cell = self.cells[idx];
                 let live_neighbours = self.live_neighbour_count(row, col);
 
-                next.set(idx, match (cell, live_neighbours) {
+
+                let next_cell = match (cell, live_neighbours) {
                     (true, 2) | (true, 3) => true,
                     (true, x) if x < 2 || x > 3 => false,
                     (false, 3) => true,
                     (state, _) => state,
-                });
+                };
+
+                next.set(idx, next_cell);
+
+                if cell != next_cell {
+                    log!(
+                        "cell[{}, {}] is initially {:?} and has {} live neighbours, it becomes {:?}",
+                        row,
+                        col,
+                        if cell { Cell::Alive } else { Cell::Dead },
+                        live_neighbours,
+                        if next_cell { Cell::Alive } else { Cell::Dead }
+
+                    );
+                }
+
             }
         }
 
