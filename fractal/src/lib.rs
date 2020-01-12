@@ -15,10 +15,10 @@ extern {
 
 #[wasm_bindgen]
 struct AnimationState {
-    shift: f64,
+    shift: (f64, f64),
     zoom: f64,
     size: usize,
-    data: *const u8,
+    data: Vec<u8>,
     up_to_date: bool
 }
 
@@ -36,69 +36,102 @@ const COLOR_SIZE : usize = 4;
 
 fn find_point_color(x: f64, y: f64) -> Color {
     // TODO:
-    Color {r: 64, g: 32, b: 128}
+    let x = x as i64;
+    let y = y as i64;
+    Color {r: (x % 255) as u8, g: (y % 255) as u8, b: (x * y % 255) as u8}
 }
 
-fn rescale(point: usize, shift: f64, zoom: f64) -> f64 {
-    // TODO:
-    point as f64
+fn rescale(point: (usize, usize), shift: (f64, f64), zoom: f64) -> (f64, f64) {
+    let (x,y) = point;
+    let (shift_x, shift_y) = shift;
+    ((x as f64 + shift_x) / zoom, (y as f64 + shift_y) / zoom)
 }
 
 fn translate_coordinates(row: usize, col: usize, size: usize) -> usize {
     (row * size + col) * COLOR_SIZE
 }
 
-fn generate_picture(shift: f64, zoom: f64, size: usize) -> *const u8 {
-    let mut data : Vec<u8> = vec![255; size * size * 4];
+#[wasm_bindgen]
+impl AnimationState {
+    pub fn new(size: usize) -> AnimationState {
+        let mut data : Vec<u8> = vec![255; size * size * 4];
 
-    for row in 0..size {
-        for col in 0..size {
-            let y = rescale(row, shift, zoom);
-            let x = rescale(col, shift, zoom);
-            let index = translate_coordinates(row, col, size);
-            let color = find_point_color(x, y);
-            data[index + R] = color.r;
-            data[index + G] = color.g;
-            data[index + B] = color.b;
+        AnimationState {
+            shift: (0.0, 0.0), 
+            zoom: 1.0,
+            size: size,
+            data: data,
+            up_to_date: false
         }
     }
 
-    data.as_ptr()
-}
+    fn update_frame(&mut self) {
+        for row in 0..self.size {
+            for col in 0..self.size {
+                let (x,y) = rescale((col, row), self.shift, self.zoom);
+                let color = find_point_color(x, y);
 
-#[wasm_bindgen]
-impl AnimationState {
-    pub fn new(shift: f64, zoom: f64, size: usize) -> AnimationState {
-        AnimationState {
-            shift: shift, 
-            zoom: zoom,
-            size: size,
-            data: generate_picture(shift, zoom, size),
-            up_to_date: true
+                let index = translate_coordinates(row, col, self.size);
+                self.data[index + R] = color.r;
+                self.data[index + G] = color.g;
+                self.data[index + B] = color.b;
+            }
         }
     }
 
     pub fn get_data(&mut self) -> *const u8 {
         if !self.up_to_date {
-            self.data = generate_picture(
-                self.shift,
-                self.zoom,
-                self.size
-            );
+            self.update_frame();
             self.up_to_date = true;
         }
 
-        self.data
+        self.data.as_ptr()
     }
 
-    pub fn zoom(&mut self, amount: f64) {
-        self.zoom += amount;
-        self.up_to_date = false;
+    pub fn get_zoom(&self) -> f64 {
+        self.zoom
     }
 
-    pub fn shift(&mut self, amount: f64) {
-        self.shift += amount;
-        self.up_to_date = false;
+    pub fn get_shift_x(&self) -> f64 {
+        self.shift.0
+    }
+
+    pub fn set_zoom(&mut self, zoom: f64) {
+        if self.zoom != zoom {
+            self.zoom = zoom;
+            self.up_to_date = false;
+        }
+    }
+
+    pub fn set_shift_x(&mut self, shift_x: f64) {
+        if self.shift.0 != shift_x {
+            self.shift.0 = shift_x;
+            self.up_to_date = false;
+        }
+    }
+
+    pub fn set_shift_y(&mut self, shift_y: f64) {
+        if self.shift.1 != shift_y {
+            self.shift.1 = shift_y;
+            self.up_to_date = false;
+        }
+    }
+
+    pub fn set_shift(&mut self, shift_x: f64, shift_y: f64) {
+        self.set_shift_x(shift_x);
+        self.set_shift_y(shift_y);
+    }
+
+    pub fn get_shift_y(&self) -> f64 {
+        self.shift.1
+    }
+
+    pub fn zoom_by(&mut self, amount: f64) {
+        self.set_zoom(self.zoom + amount)
+    }
+
+    pub fn shift_by(&mut self, amount_x: f64, amount_y: f64) {
+        self.set_shift(self.shift.0 + amount_x, self.shift.1 + amount_y)
     }
 }
 
