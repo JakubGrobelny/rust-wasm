@@ -40,7 +40,7 @@ const COLOR_SIZE : usize = 4;
 fn find_point_color(x: f64, y: f64) -> Color {
     // based on https://en.wikipedia.org/wiki/Newton_fractal
     fn function(z: Complex<f64>) -> Complex<f64> {
-        z.powf(3.0) - Complex::new(1.0, 0.0)
+        z * z * z - Complex::new(1.0, 0.0)
     }
 
     fn derivative(z: Complex<f64>) -> Complex<f64> {
@@ -49,8 +49,8 @@ fn find_point_color(x: f64, y: f64) -> Color {
 
     fn newton(x: f64, y: f64) -> Color {
         let mut iteration : usize = 1;
-        let max_iter : usize = 100;
-        let tolerance : f64 = 0.0000001;
+        let max_iter : usize = 70;
+        let tolerance : f64 = 0.001;
         let roots : [Complex<f64>; 3] = [
             Complex::new( 1.0,  0.0),
             Complex::new(-0.5,  3f64.sqrt() / 2.0),
@@ -80,12 +80,13 @@ fn find_point_color(x: f64, y: f64) -> Color {
         }
 
         if closest <= 3 { 
-            let color = colors[closest];
-            Color {
-                r: color.r / (iteration as u8 / 10) * 3, 
-                g: color.g / (iteration as u8 / 10) * 3, 
-                b: color.b / (iteration as u8 / 10) * 3,
-            }
+            colors[closest].clone()
+            // let color = colors[closest];
+            // Color {
+            //     r: color.r / (iteration as u8 / 10) * 4, 
+            //     g: color.g / (iteration as u8 / 10) * 4, 
+            //     b: color.b / (iteration as u8 / 10) * 4,
+            // }
         } else {
             Color {r: 0, g: 0, b: 0}
         }

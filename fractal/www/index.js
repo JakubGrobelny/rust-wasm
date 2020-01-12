@@ -23,30 +23,28 @@ const updateImageData = () => {
     context.putImageData(imageData, 0, 0);
 }
 
-const updateAnimation = () => {
-    let zoom = animation.get_zoom();
-    if (zoom > 5.0) {
-        zoom = 1.0;
-    } else {
-        zoom += 0.1;
-    }
-    animation.set_zoom(zoom);
+let zoom = 1.0;
+let maxZoom = 10.0;
+let minZoom = 0.1;
+let deltaZoom = 0.01;
 
-    let shift = animation.get_shift_x();
-    if (shift > 10000) {
-        shift = 0.0;
-    } else {
-        shift += 50.0;
+const updateAnimation = () => {
+    if (zoom < minZoom || zoom > maxZoom) {
+        deltaZoom *= -1;
     }
-    animation.set_shift(shift, -shift/2);
+    
+    zoom += deltaZoom;
+
+    animation.set_zoom(zoom);
+    console.log(zoom);
 }
 
 const renderLoop = () => {    
-    // updateAnimation();
+    updateAnimation();
     updateImageData();
     requestAnimationFrame(renderLoop);
 };
 
-animation.set_zoom(0.0001);
-animation.set_shift(0, -750);
+animation.set_zoom(0.001);
+animation.set_shift(400, 400);
 renderLoop();
