@@ -42,9 +42,11 @@ const updateAnimation = () => {
 }
 
 const renderLoop = () => {    
-    updateAnimation();
+    // updateAnimation();
     updateImageData();
     requestAnimationFrame(renderLoop);
 };
 
+animation.set_zoom(0.0001);
+animation.set_shift(0, -750);
 renderLoop();

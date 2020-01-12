@@ -1,6 +1,8 @@
 mod utils;
 
 use wasm_bindgen::prelude::*;
+extern crate num;
+use num::complex::Complex;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -22,6 +24,7 @@ struct AnimationState {
     up_to_date: bool
 }
 
+#[derive(Clone, Copy)]
 struct Color {
     r: u8,
     g: u8,
@@ -35,16 +38,66 @@ const A : usize = 3;
 const COLOR_SIZE : usize = 4;
 
 fn find_point_color(x: f64, y: f64) -> Color {
-    // TODO:
-    let x = x as i64;
-    let y = y as i64;
-    Color {r: (x % 255) as u8, g: (y % 255) as u8, b: (x * y % 255) as u8}
+    // based on https://en.wikipedia.org/wiki/Newton_fractal
+    fn function(z: Complex<f64>) -> Complex<f64> {
+        z.powf(3.0) - Complex::new(1.0, 0.0)
+    }
+
+    fn derivative(z: Complex<f64>) -> Complex<f64> {
+        3.0 * z * z
+    }
+
+    fn newton(x: f64, y: f64) -> Color {
+        let mut iteration : usize = 1;
+        let max_iter : usize = 100;
+        let tolerance : f64 = 0.0000001;
+        let roots : [Complex<f64>; 3] = [
+            Complex::new( 1.0,  0.0),
+            Complex::new(-0.5,  3f64.sqrt() / 2.0),
+            Complex::new(-0.5, -3f64.sqrt() / 2.0)
+        ];
+
+        let colors : [Color; 3] = [
+            Color {r: 255, g: 0,   b: 0  },
+            Color {r: 0,   g: 255, b: 0  },
+            Color {r: 0,   g: 0,   b: 255}
+        ];
+
+        let mut closest : usize = 4;
+        let mut z = Complex::new(x, y);
+
+        'outer: while iteration < max_iter {
+            z -= function(z) / derivative(z);
+            for i in 0..roots.len() {
+                let diff = z - roots[i];
+                if diff.re.abs() < tolerance && diff.im.abs() < tolerance {
+                    closest = i;
+                    break 'outer;
+                }
+            }
+
+            iteration += 1;
+        }
+
+        if closest <= 3 { 
+            let color = colors[closest];
+            Color {
+                r: color.r / (iteration as u8 / 10) * 3, 
+                g: color.g / (iteration as u8 / 10) * 3, 
+                b: color.b / (iteration as u8 / 10) * 3,
+            }
+        } else {
+            Color {r: 0, g: 0, b: 0}
+        }
+    }
+
+    newton(x, y)
 }
 
 fn rescale(point: (usize, usize), shift: (f64, f64), zoom: f64) -> (f64, f64) {
     let (x,y) = point;
     let (shift_x, shift_y) = shift;
-    ((x as f64 + shift_x) / zoom, (y as f64 + shift_y) / zoom)
+    ((x as f64 - shift_x) / zoom, (y as f64 - shift_y) / zoom)
 }
 
 fn translate_coordinates(row: usize, col: usize, size: usize) -> usize {
