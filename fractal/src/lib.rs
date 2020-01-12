@@ -42,7 +42,8 @@ struct AnimationState {
     zoom: f64,
     size: usize,
     data: Vec<u8>,
-    up_to_date: bool
+    up_to_date: bool,
+    fractal: fn(x: f64, y: f64) -> Color,
 }
 
 #[derive(Clone, Copy)]
@@ -57,10 +58,41 @@ const G : usize = 1;
 const B : usize = 2;
 const COLOR_SIZE : usize = 4;
 
-fn find_point_color(x: f64, y: f64) -> Color {
+fn clamp_u8(val: usize) -> u8 {
+    if val > 255 {
+        255
+    } else {
+        val as u8
+    }
+}
+
+fn invalid_fractal(_: f64, _: f64) -> Color {
+    Color {r: 0, g: 0, b: 0}
+}
+
+fn mandelbrot_set(x: f64, y: f64) -> Color {
+    let c = Complex::new(x, y);
+    let mut z = Complex::new(0f64, 0f64);
+    let max_iter : usize = 100;
+
+    let mut i = 0;
+    for t in 0..max_iter {
+        if z.norm() > 2.0 {
+            break;
+        }
+        z = z * z + c;
+        i = t;
+    }
+
+    Color {r: (max_iter - i) as u8, g: i as u8, b: clamp_u8(i*i) as u8}
+}
+
+fn newton_fractal(x: f64, y: f64) -> Color {
     // based on https://en.wikipedia.org/wiki/Newton_fractal
     fn function(z: Complex<f64>) -> Complex<f64> {
-        z * z * z - Complex::new(1.0, 0.0)
+        let mut z3 = z * z * z;
+        z3.re -= 1.0;
+        z3
     }
 
     fn derivative(z: Complex<f64>) -> Complex<f64> {
@@ -69,8 +101,8 @@ fn find_point_color(x: f64, y: f64) -> Color {
 
     fn newton(x: f64, y: f64) -> Color {
         let mut iteration : usize = 1;
-        let max_iter : usize = 64;
-        let tolerance : f64 = 0.003;
+        let max_iter : usize = 128;
+        let tolerance : f64 = 0.005;
 
         let roots : [(f64,f64); 3] = [
             (1.0, 0.0),
@@ -93,14 +125,6 @@ fn find_point_color(x: f64, y: f64) -> Color {
             }
 
             iteration += 1;
-        }
-
-        fn clamp_u8(val: usize) -> u8 {
-            if val > 255 {
-                255
-            } else {
-                val as u8
-            }
         }
 
         let col0 = 255 - clamp_u8(iteration * iteration / 4);
@@ -127,7 +151,7 @@ fn translate_coordinates(row: usize, col: usize, size: usize) -> usize {
 
 #[wasm_bindgen]
 impl AnimationState {
-    pub fn new(size: usize) -> AnimationState {
+    pub fn new(size: usize, fractal: &str) -> AnimationState {
         utils::set_panic_hook();
         let mut data : Vec<u8> = vec![255; size * size * 4];
 
@@ -136,21 +160,37 @@ impl AnimationState {
             zoom: 1.0,
             size: size,
             data: data,
-            up_to_date: false
+            up_to_date: false,
+            fractal: match fractal {
+                "newton" => newton_fractal,
+                "mandelbrot" => mandelbrot_set,
+                _ => invalid_fractal,
+            }
         }
+    }
+
+    fn update_pixel(&mut self, col: usize, row: usize) {
+        let (x,y) = rescale((col, row), self.shift, self.zoom);
+        let f = self.fractal;
+        let color = f(x, y);
+
+        let index = translate_coordinates(row, col, self.size);
+        self.data[index + R] = color.r;
+        self.data[index + G] = color.g;
+        self.data[index + B] = color.b;
     }
 
     fn update_frame(&mut self) {
         let _timer = Timer::new("Animation::update_frame");
-        for row in 0..self.size {
-            for col in 0..self.size {
-                let (x,y) = rescale((col, row), self.shift, self.zoom);
-                let color = find_point_color(x, y);
 
-                let index = translate_coordinates(row, col, self.size);
-                self.data[index + R] = color.r;
-                self.data[index + G] = color.g;
-                self.data[index + B] = color.b;
+        for row in 0..self.size / 2 {
+            for col in 0..self.size / 2 {
+                self.update_pixel(col, row);
+                let col_mirror = self.size - col - 1;
+                let row_mirror = self.size - row - 1;
+                self.update_pixel(col_mirror, row_mirror);
+                self.update_pixel(col_mirror, row);
+                self.update_pixel(col, row_mirror);
             }
         }
     }
