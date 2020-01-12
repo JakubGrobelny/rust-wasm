@@ -26,7 +26,7 @@ const updateImageData = () => {
 let zoom = 1.0;
 let maxZoom = 10.0;
 let minZoom = 0.1;
-let deltaZoom = 0.01;
+let deltaZoom = 0.05;
 
 const updateAnimation = () => {
     if (zoom < minZoom || zoom > maxZoom) {
@@ -39,7 +39,7 @@ const updateAnimation = () => {
     console.log(zoom);
 }
 
-const renderLoop = () => {    
+const renderLoop = () => {
     updateAnimation();
     updateImageData();
     requestAnimationFrame(renderLoop);

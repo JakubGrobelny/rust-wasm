@@ -1,8 +1,12 @@
 mod utils;
 
 use wasm_bindgen::prelude::*;
+
 extern crate num;
 use num::complex::Complex;
+
+extern crate web_sys;
+use web_sys::console;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -13,6 +17,23 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[wasm_bindgen]
 extern {
     fn alert(s: &str);
+}
+
+pub struct Timer<'a> {
+    name: &'a str,
+}
+
+impl<'a> Timer<'a> {
+    pub fn new(name: &'a str) -> Timer<'a> {
+        console::time_with_label(name);
+        Timer { name }
+    }
+}
+
+impl<'a> Drop for Timer<'a> {
+    fn drop(&mut self) {
+        console::time_end_with_label(self.name);
+    }
 }
 
 #[wasm_bindgen]
@@ -34,7 +55,6 @@ struct Color {
 const R : usize = 0;
 const G : usize = 1;
 const B : usize = 2;
-const A : usize = 3;
 const COLOR_SIZE : usize = 4;
 
 fn find_point_color(x: f64, y: f64) -> Color {
@@ -49,28 +69,24 @@ fn find_point_color(x: f64, y: f64) -> Color {
 
     fn newton(x: f64, y: f64) -> Color {
         let mut iteration : usize = 1;
-        let max_iter : usize = 70;
-        let tolerance : f64 = 0.001;
-        let roots : [Complex<f64>; 3] = [
-            Complex::new( 1.0,  0.0),
-            Complex::new(-0.5,  3f64.sqrt() / 2.0),
-            Complex::new(-0.5, -3f64.sqrt() / 2.0)
+        let max_iter : usize = 64;
+        let tolerance : f64 = 0.003;
+
+        let roots : [(f64,f64); 3] = [
+            (1.0, 0.0),
+            (-0.5, 3f64.sqrt() / 2.0),
+            (-0.5, -3f64.sqrt() / 2.0)
         ];
 
-        let colors : [Color; 3] = [
-            Color {r: 255, g: 0,   b: 0  },
-            Color {r: 0,   g: 255, b: 0  },
-            Color {r: 0,   g: 0,   b: 255}
-        ];
-
-        let mut closest : usize = 4;
+        let mut closest : usize = 3;
         let mut z = Complex::new(x, y);
 
         'outer: while iteration < max_iter {
             z -= function(z) / derivative(z);
             for i in 0..roots.len() {
-                let diff = z - roots[i];
-                if diff.re.abs() < tolerance && diff.im.abs() < tolerance {
+                let im_diff = (roots[i].1 - z.im).abs();
+                let re_diff = (roots[i].0 - z.re).abs();
+                if im_diff < tolerance && re_diff < tolerance {
                     closest = i;
                     break 'outer;
                 }
@@ -79,16 +95,20 @@ fn find_point_color(x: f64, y: f64) -> Color {
             iteration += 1;
         }
 
-        if closest <= 3 { 
-            colors[closest].clone()
-            // let color = colors[closest];
-            // Color {
-            //     r: color.r / (iteration as u8 / 10) * 4, 
-            //     g: color.g / (iteration as u8 / 10) * 4, 
-            //     b: color.b / (iteration as u8 / 10) * 4,
-            // }
-        } else {
-            Color {r: 0, g: 0, b: 0}
+        fn clamp_u8(val: usize) -> u8 {
+            if val > 255 {
+                255
+            } else {
+                val as u8
+            }
+        }
+
+        let col0 = 255 - clamp_u8(iteration * iteration / 4);
+        match closest {
+            0 => Color {r: col0, g: col0, b: 0},
+            1 => Color {r: 0, g: col0, b: col0},
+            2 => Color {r: col0, g: col0/2, b: col0},
+            _ => Color {r: 0, g: 0, b: 0},
         }
     }
 
@@ -108,6 +128,7 @@ fn translate_coordinates(row: usize, col: usize, size: usize) -> usize {
 #[wasm_bindgen]
 impl AnimationState {
     pub fn new(size: usize) -> AnimationState {
+        utils::set_panic_hook();
         let mut data : Vec<u8> = vec![255; size * size * 4];
 
         AnimationState {
@@ -120,6 +141,7 @@ impl AnimationState {
     }
 
     fn update_frame(&mut self) {
+        let _timer = Timer::new("Animation::update_frame");
         for row in 0..self.size {
             for col in 0..self.size {
                 let (x,y) = rescale((col, row), self.shift, self.zoom);
