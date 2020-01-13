@@ -10,7 +10,7 @@ canvas.width = size;
 
 const context = canvas.getContext('2d');
 
-const animation = fractal.AnimationState.new(size, "mandelbrot");
+const animation = fractal.AnimationState.new(size, "newton");
 
 const updateImageData = () => {
     let picture = new Uint8ClampedArray(
@@ -22,16 +22,17 @@ const updateImageData = () => {
     let imageData = new ImageData(picture, size, size);
     context.putImageData(imageData, 0, 0);
 }
+// for mandelbrot set
+// let zoom = 200.0;
+// let maxZoom = 300;
+// let minZoom = 50;
+// let deltaZoom = 1;
 
-let zoom = 200.0;
-let maxZoom = 300;
-let minZoom = 50;
-let deltaZoom = 1;
-// For newton fractal:
-// let zoom = 1.0;
-// let maxZoom = 10.0;
-// let minZoom = 0.1;
-// let deltaZoom = 0.05;
+// for newton fractal:
+let zoom = 1.0;
+let maxZoom = 100.0;
+let minZoom = 0.1;
+let deltaZoom = 0.1;
 
 
 let shift_x = 600;
